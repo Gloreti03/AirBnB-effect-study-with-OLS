@@ -63,9 +63,3 @@ data/
 geo/                  GeoJSON boundary files for all four cities
 notebook_airbnb.ipynb Main processing and analysis notebook
 ```
-
-## Course Context
-
-This project is submitted as the group assessment for the Digital Economy course. Intermediate presentations are scheduled for March 9 and March 13. Final presentations will take place on April 24, April 27, and May 4.
-
-The project addresses topic area 3 from the course guidelines — a case study of a business model that has undergone significant transformation through network platforms — and connects directly to the course themes of platform economics, data and digital policy, and competition dynamics in the digital economy.
