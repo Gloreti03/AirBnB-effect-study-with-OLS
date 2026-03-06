@@ -1,0 +1,5 @@
+Città,β_Δlistings,p-value,Sig.,AIC,N,Unità rent
+Roma,-1e-06,0.1992,n.s.,-82.9,15,€/m²/mese
+Milano,-4e-06,0.7917,n.s.,-73.2,15,€/m²/mese
+Firenze,1e-06,0.722,n.s.,-119.6,15,€/m²/mese
+New York,0.001322,0.8645,n.s.,414.9,33,$/mese
