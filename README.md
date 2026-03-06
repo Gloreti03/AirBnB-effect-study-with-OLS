@@ -63,10 +63,10 @@ The cross-city comparison tests whether $\beta$ is larger for Florence — the m
 
 | City | 2023–2024 | 2025 | Snapshots |
 |------|-----------|------|-----------|
-| Rome | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 4 snapshots (Mar, Jun, Jul, Sep) | 8 |
+| Rome | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 3 snapshots (Mar, Jun, Sep) | 7 |
 | Milan | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 2 snapshots (Jun, Sep) | 6 |
 | Florence | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 3 snapshots (Mar, Jun, Sep) | 7 |
-| New York | Kaggle archives — 2 snapshots (Mar 2023, Jan 2024) | Inside Airbnb — 9 snapshots (Mar–Dec 2025) | 11 |
+| New York | Kaggle archives — 2 snapshots (Mar 2023, Jan 2024) | Inside Airbnb — 11 snapshots (Mar–Dec 2025) | 13 |
 
 ### Residential price data
 
@@ -112,6 +112,8 @@ data/
     omi_milano.csv                    OMI abitazioni civili — Milano (tutti i semestri)
     omi_firenze.csv                   OMI abitazioni civili — Firenze (tutti i semestri)
     omi_master.csv                    OMI abitazioni civili — tutte le città
+    panel_model.csv                   Panel mensile (rent + n_listings) per città — input per la modellazione
+    arimax_results.csv                Risultati modelli ARIMAX/ITS per città
 geo/
   neighbourhoodsMilano.geojson
   nieghborhoddsRoma.geojson
