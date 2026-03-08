@@ -111,6 +111,14 @@ $$\text{loc\_medio}_{z,t} = \alpha + \beta \, \log(1 + \text{density}_{z,t}) + \
 
 ---
 
+### Phase 5 — Conclusions and Policy Recommendations
+
+The final phase synthesises the empirical results from both the ITS model (New York) and the cross-sectional OLS (Italian cities) into a unified interpretation of the Airbnb effect on residential rental markets. We assess the strength and consistency of the evidence across cities and modelling strategies, discuss the limitations of the analyses, and reflect on the broader implications for platform economics.
+
+On the basis of the findings, we formulate a set of **policy recommendations** targeted at urban regulators and local authorities. These include proposals on listing caps, host registration requirements, short-term rental taxation, and zoning instruments — drawing on the lessons from Local Law 18 in New York as a natural policy benchmark. The cross-city comparison allows us to calibrate recommendations to different market contexts, distinguishing between high-saturation tourist cities (Florence) and larger, more diversified rental markets (Milan, Rome, New York).
+
+---
+
 ## Data Sources
 
 ### Airbnb listing data
