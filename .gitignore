@@ -19,3 +19,6 @@ Thumbs.db
 
 # Temp extraction folders
 arch*_check/
+
+# Claude Code memory (local only)
+.claude/
