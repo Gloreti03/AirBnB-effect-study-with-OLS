@@ -10,122 +10,180 @@ The core hypothesis is that the expansion of short-term rental platforms generat
 
 To what extent does the volume of active Airbnb listings affect residential rental prices, and does this effect differ across cities with distinct market structures, regulatory regimes, and tourism intensities?
 
+---
+
 ## Analytical Pipeline
 
 ### Phase 1 — Data Gathering and Preprocessing
 
 The analysis requires two parallel data streams aligned at a common frequency from 2023 to 2025.
 
-The residential rental price series is sourced from Zillow's ZORI (Zillow Observed Rent Index, unadjusted) for New York, and from OMI (Osservatorio del Mercato Immobiliare, Agenzia delle Entrate) semi-annual quotations for Rome, Milan, and Florence. OMI data provide compravendita and locazione prices per m² at the zona level and are linearly interpolated to produce monthly estimates.
+**Residential rental prices** are sourced from:
+- **Zillow ZORI** (Zillow Observed Rent Index, unadjusted) for New York — monthly series, expressed in $/month, averaged across all NYC ZIP codes.
+- **OMI** (Osservatorio del Mercato Immobiliare, Agenzia delle Entrate) for Rome, Milan, and Florence — semi-annual quotations of `loc_medio` (€/m²/month) for *abitazioni civili* (residential dwellings, `Cod_Tip = 20`) at the zona level, linearly interpolated to produce monthly estimates.
 
-The Airbnb market pressure signal is constructed from Inside Airbnb historical snapshots. For each city and each time period, the number of active entire-home listings is computed per neighbourhood, excluding private rooms and shared rooms on the grounds that only entire-unit withdrawals materially reduce the supply available to long-term tenants. Between snapshot dates, listing counts are held constant via forward-fill to produce a continuous monthly series.
+**Airbnb market pressure** is constructed from Inside Airbnb historical snapshots. For each city and each time period, the number of active *Entire home/apt* listings is computed per neighbourhood. Private rooms and shared rooms are excluded because only entire-unit withdrawals materially reduce the supply available to long-term tenants. Between snapshot dates, listing counts are held constant via forward-fill to produce a continuous monthly series.
+
+**Key outputs:**
+- `data/processed/<city>.csv` — all Airbnb snapshots merged per city (all room types)
+- `data/processed/master_airbnb.csv` — all cities combined, filtered on Entire home/apt only
+- `data/processed/omi_<city>.csv` / `omi_master.csv` — OMI residential quotations
+- `data/processed/panel_italy.csv` — monthly panel: OMI rent (€/m²/mese) + n\_listings, Italian cities
+- `data/processed/panel_ny.csv` — monthly panel: Zillow ZORI ($/mese) + n\_listings, New York
+
+> ⚠️ **The two rent series are not comparable**: OMI measures €/m²/month (unit price per square metre), while ZORI measures absolute monthly rent in $. They operate on completely different scales and must never be combined in the same regression.
+
+---
 
 ### Phase 2 — Exploratory Data Analysis (EDA)
 
 Before any modelling, a systematic EDA characterises the data along six dimensions:
 
-- **Listing trends over time** — monthly active Entire home/apt listings for all four cities on a common timeline, with real snapshot dates marked. The sharp contraction in New York following Local Law 18 is immediately visible.
-- **New York Local Law 18 inspection** — dual-axis chart overlaying listing volume (left axis) and Zillow ZORI rent index (right axis), with the September 2023 enforcement date annotated. This motivates the ITS modelling strategy.
-- **OMI rent trends** — city-level canone locazione (€/m²/mese) for Rome, Milan, and Florence across the five available semesters (2023/1–2025/1), with interpolated values shown as dashed lines between real data points.
-- **Airbnb price distributions** — box plots of nightly prices clipped at the 95th percentile, shown separately for Italian cities (EUR) and New York (USD) since the two currencies are not directly comparable.
-- **Neighbourhood concentration** — top-10 most listed neighbourhoods per city based on the most recent snapshot, revealing the geographic concentration of Airbnb supply.
-- **New York seasonality heatmap** — month × year grid of listing counts, making seasonal patterns and the LL18 shock visible simultaneously.
+1. **Listing trends over time** — monthly active Entire home/apt listings for all four cities on a common timeline, with real snapshot dates marked as dots. The sharp contraction in New York following Local Law 18 is immediately visible as a near-vertical drop in September 2023.
+
+2. **New York Local Law 18 inspection** — dual-axis chart overlaying listing volume (left axis, orange) and Zillow ZORI rent index (right axis, dark) with the September 2023 enforcement date annotated in red. This chart motivates the ITS modelling strategy by placing the supply shock and the rent series on the same timeline.
+
+3. **OMI rent trends** — city-level `loc_medio` (€/m²/mese) for Rome, Milan, and Florence across the five available semesters (2023/1–2025/1), shown as connected dots at the real OMI reference dates (end of each semester).
+
+4. **Airbnb price distributions** — box plots of nightly prices clipped at the 95th percentile, shown in two separate panels: Italian cities (EUR) and New York (USD), since the two currencies are not directly comparable. Each box shows the interquartile range of prices, with the white line indicating the median.
+
+5. **Neighbourhood concentration** — horizontal bar charts of the top-10 most listed neighbourhoods per city based on the most recent available snapshot, revealing the geographic concentration of Airbnb supply within each city.
+
+6. **New York seasonality heatmap** — a year × month grid of listing counts (only real snapshot months are filled; grey cells = no snapshot available). The LL18 shock in September 2023 is highlighted with a black rectangle, making seasonal patterns and the regulatory shock visible simultaneously.
+
+---
 
 ### Phase 3 — New York: Interrupted Time Series (ITS)
 
-New York provides the cleanest identification opportunity: Local Law 18, enforced from September 2023, imposed a host registration requirement that caused active Entire home/apt listings to fall from approximately 24,000 to 11,500 within two months — a ~55% contraction. This constitutes a plausibly exogenous shock to short-term rental supply.
+New York provides the cleanest identification opportunity in the dataset. Local Law 18, enforced from September 2023, imposed a host registration requirement that caused active Entire home/apt listings to fall from approximately 24,000 to 11,500 within two months — a ~55% contraction. This constitutes a plausibly exogenous shock to short-term rental supply that is exploited as a natural experiment.
 
-The ITS model estimates the effect of this shock on the Zillow ZORI rent index:
+The ITS model estimates the causal effect of this regulatory shock on the Zillow ZORI rent index:
 
-$$\text{ZORI}_t = \alpha + \beta_1 t + \beta_2 \cdot \mathbf{1}_{t > T} + \beta_3 (t - T) \cdot \mathbf{1}_{t > T} + \varepsilon_t$$
+$$\text{ZORI}_t = \alpha + \beta_1 \, t + \beta_2 \cdot \mathbf{1}[t > T] + \beta_3 \, (t - T) \cdot \mathbf{1}[t > T] + \varepsilon_t$$
 
-where $T$ is September 2023, $\beta_2$ captures an immediate level shift in rents (if any), and $\beta_3$ captures a change in the post-intervention trend. The hypothesis consistent with the supply-withdrawal channel is $\beta_2 > 0$ (rents jump) or $\beta_3 < 0$ (rent growth decelerates following the supply restoration as hosts exit the platform permanently).
+**Variable legend:**
 
-With N = 34 monthly observations (March 2023 – December 2025) of real Zillow data, this model has adequate degrees of freedom for a two-breakpoint OLS regression.
+| Symbol | Type | Description |
+|--------|------|-------------|
+| $\text{ZORI}_t$ | **Target (dependent variable)** | Zillow Observed Rent Index at month $t$ — average monthly rent in $/month across all NYC ZIP codes. This is what the model tries to explain. |
+| $t$ | Regressor | Time index: integer counting months elapsed from the start of the series (March 2023 = 0, April 2023 = 1, …, December 2025 = 33). Captures the baseline linear trend in rents before and after the intervention. |
+| $T$ | Fixed constant | The intervention date: September 2023, encoded as the integer value of $t$ at that month. Everything after $T$ is "post-intervention". |
+| $\mathbf{1}[t > T]$ | Regressor | Dummy variable equal to 1 for all months strictly after September 2023, 0 before. Captures any **immediate level shift** in rents at the moment of the intervention. |
+| $(t - T) \cdot \mathbf{1}[t > T]$ | Regressor | Interaction term: months elapsed *since* the intervention, equal to 0 before $T$ and counting up from 1 afterward. Captures any **change in the slope** (trend) of rent growth after the intervention. |
+| $\alpha$ | Parameter | Intercept — baseline rent level at $t = 0$ (March 2023). |
+| $\beta_1$ | Parameter | **Pre-intervention trend** — monthly change in ZORI before September 2023, in $/month per month. |
+| $\beta_2$ | Parameter | **Immediate level shift** — the jump (positive) or drop (negative) in ZORI on the month of intervention, in $/month. A positive $\beta_2$ would mean rents jumped up right after LL18. |
+| $\beta_3$ | Parameter | **Post-intervention trend change** — the additional monthly slope after LL18 relative to the pre-intervention trend. A negative $\beta_3$ means rent growth slowed down post-intervention (consistent with restored supply). |
+| $\varepsilon_t$ | Error | OLS residual. |
+
+**Interpretation of hypotheses:** The supply-withdrawal channel predicts that *more* Airbnb listings → *higher* rents. If LL18 removed listings and returned supply to the long-term market, we would expect either $\beta_2 < 0$ (rents drop immediately) or $\beta_3 < 0$ (rent growth decelerates as the housing supply rebuilds). Conversely, if rents were already rising for other reasons, $\beta_2$ might be non-significant.
+
+The model is estimated on **N = 34 monthly observations** (March 2023 – December 2025) of real Zillow ZORI data for the New York metropolitan area.
+
+---
 
 ### Phase 4 — Italy: Cross-Sectional OLS per OMI zona
 
-For the Italian cities, the time dimension is too thin (5 semesters) to support time-series modelling. Instead, the analysis exploits between-zone variation within each city and across the three cities.
+For the Italian cities, the time dimension is too thin (only 5 semesters) to support a credible time-series model. Instead, the analysis exploits **between-zone variation** within each city and across the three cities simultaneously.
 
-The unit of observation is an **OMI zona × semester** cell. Each zona is matched to the count of active Airbnb listings in the corresponding neighbourhood via a spatial join between the Inside Airbnb `neighbourhood_cleansed` field and the OMI `LinkZona` identifier, using the GeoJSON boundary files available in `geo/`. Listing density is computed as listings per resident population or per km² of the zona.
+The unit of observation is an **OMI zona × semester** cell. Each zona is matched to the count of active Airbnb listings in the corresponding neighbourhood via a spatial join between the Inside Airbnb `neighbourhood_cleansed` field and the OMI `LinkZona` identifier, using the GeoJSON boundary files in `geo/`. Listing density is computed as listings per km² (or per resident population) of the zona.
 
 The model:
 
-$$\text{loc\_medio}_{z,t} = \alpha + \beta \log(1 + \text{density}_{z,t}) + \gamma_f + \delta_c + \varepsilon_{z,t}$$
+$$\text{loc\_medio}_{z,t} = \alpha + \beta \, \log(1 + \text{density}_{z,t}) + \gamma_f + \delta_c + \varepsilon_{z,t}$$
 
-where $\gamma_f$ is a fascia fixed effect (A/B/C capturing centre vs. periphery) and $\delta_c$ is a city fixed effect. This specification absorbs time-invariant city and zone characteristics and isolates the within-fascia variation in listing density as the identifying source of variation.
+**Variable legend:**
 
-The cross-city comparison tests whether $\beta$ is larger for Florence — the most tourism-saturated city in relative terms — than for Rome or Milan, consistent with the supply-withdrawal hypothesis.
+| Symbol | Type | Description |
+|--------|------|-------------|
+| $\text{loc\_medio}_{z,t}$ | **Target (dependent variable)** | OMI average rental price in **€/m²/month** for zona $z$ at semester $t$. Computed as the midpoint of OMI's `Loc_min` and `Loc_max` quotations for *abitazioni civili* (`Cod_Tip = 20`). This is the price a landlord can expect per square metre of residential space in that zona. |
+| $z$ | Index | OMI zona identifier (`LinkZona`) — the finest spatial unit in the OMI dataset, a sub-neighbourhood micro-zone. |
+| $t$ | Index | Semester index: one of the 5 available periods (2023/1, 2023/2, 2024/1, 2024/2, 2025/1). |
+| $\log(1 + \text{density}_{z,t})$ | Regressor | Log-transformed Airbnb listing density in zona $z$ at semester $t$. The $+1$ ensures the log is defined when density = 0 (zones with no Airbnb presence). Using log rather than levels compresses the right tail and gives $\beta$ a percentage-elasticity interpretation. |
+| $\text{density}_{z,t}$ | Input to regressor | Number of active Entire home/apt Airbnb listings in the neighbourhood corresponding to zona $z$, divided by the zona's area in km² (or by resident population). |
+| $\gamma_f$ | Fixed effect | **Fascia fixed effect** — a categorical dummy for each OMI fascia (A = centro storico, B = semicentro, C = periferia, D = suburbana, E = extraurbana). Absorbs the structural rent premium of central vs. peripheral locations, so that $\beta$ is not contaminated by the fact that both Airbnb and rents are higher in city centres. |
+| $\delta_c$ | Fixed effect | **City fixed effect** — a dummy for each city (Roma, Milano, Firenze). Absorbs time-invariant differences in the overall rent level across cities (e.g., Milan's higher average rents vs. Florence). |
+| $\alpha$ | Parameter | Intercept — baseline rent for a zona in the reference fascia and reference city with zero Airbnb density. |
+| $\beta$ | Parameter | **Key coefficient of interest** — the semi-elasticity of rental prices to Airbnb density. Interpreted as: a 1% increase in $(1 + \text{density})$ is associated with a change of $\beta / 100$ €/m²/month in local rents, after controlling for city and fascia. |
+| $\varepsilon_{z,t}$ | Error | OLS residual. Standard errors clustered at the zona level. |
+
+**Cross-city comparison:** The main hypothesis is $\beta > 0$ — higher Airbnb density is associated with higher local rents, consistent with the supply-withdrawal mechanism. A secondary test checks whether $\beta$ is larger for Florence than for Rome or Milan. Florence has the highest Airbnb saturation in relative terms (listings per resident), so the supply-withdrawal effect should be most pronounced there if the channel is real.
+
+---
 
 ## Data Sources
 
 ### Airbnb listing data
 
-| City | 2023–2024 | 2025 | Snapshots |
-|------|-----------|------|-----------|
-| Rome | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 4 snapshots (Mar, Jun, Jul, Sep) | 8 |
-| Milan | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 2 snapshots (Jun, Sep) | 6 |
-| Florence | `airbnb.csv` — 4 quarterly snapshots (Mar–Dec 2024) | Inside Airbnb — 3 snapshots (Mar, Jun, Sep) | 7 |
+| City | 2024 source | 2025 source | Total snapshots |
+|------|-------------|-------------|-----------------|
+| Rome | `airbnb.csv` — 4 quarterly snapshots (Mar, Jun, Sep, Dec 2024) | Inside Airbnb — 4 snapshots (Mar, Jun, Jul, Sep 2025) | 8 |
+| Milan | `airbnb.csv` — 4 quarterly snapshots (Mar, Jun, Sep, Dec 2024) | Inside Airbnb — 2 snapshots (Jun, Sep 2025) | 6 |
+| Florence | `airbnb.csv` — 4 quarterly snapshots (Mar, Jun, Sep, Dec 2024) | Inside Airbnb — 3 snapshots (Mar, Jun, Sep 2025) | 7 |
 | New York | Kaggle archives — 2 snapshots (Mar 2023, Jan 2024) | Inside Airbnb — 9 snapshots (Mar–Sep, Nov, Dec 2025) | 11 |
+
+**Room type normalisation:** The 2024 Italy source uses the label `"Entire home"` while Inside Airbnb 2025 uses `"Entire home/apt"`. Both are mapped to `"Entire home/apt"` in the master dataset. Only this category is retained for modelling.
 
 ### Residential price data
 
-| City | Source | Format | Frequency |
-|------|--------|--------|-----------|
-| Rome | OMI — Agenzia delle Entrate | `QI_*_VALORI.csv` + `QI_*_ZONE.csv` (per semestre) | Semiannual → interpolated |
-| Milan | OMI — Agenzia delle Entrate | same | Semiannual → interpolated |
-| Florence | OMI — Agenzia delle Entrate | same | Semiannual → interpolated |
-| New York | Zillow ZORI / `new_york_data.csv` | wide-format monthly time series | Monthly |
+| City | Source | Variable | Unit | Frequency |
+|------|--------|----------|------|-----------|
+| Rome | OMI — Agenzia delle Entrate | `loc_medio` = (`Loc_min` + `Loc_max`) / 2, `Cod_Tip = 20` | €/m²/month | Semiannual → linearly interpolated to monthly |
+| Milan | OMI — Agenzia delle Entrate | same | €/m²/month | Semiannual → linearly interpolated to monthly |
+| Florence | OMI — Agenzia delle Entrate | same | €/m²/month | Semiannual → linearly interpolated to monthly |
+| New York | Zillow ZORI (`new_york_data.csv`) | Mean ZORI across all NYC ZIP codes in Metro | $/month | Monthly (no interpolation needed) |
+
+**OMI data structure:** Each semester provides two files per city — `VALORI` (price quotations per zona and property type) and `ZONE` (zona descriptions: name, fascia, microzona). The join key is `LinkZona`. Only `Cod_Tip = 20` (abitazioni civili, i.e. standard residential dwellings) is retained.
 
 ### Boundary files
 
 GeoJSON neighbourhood boundary files are available for all four cities and will be used for spatial joins and choropleth visualisation.
 
+---
+
 ## Repository Structure
 
 ```
 data/
-  airbnb/                             Airbnb listing data (all sources)
+  airbnb/
     italy_2024/
       airbnb.csv                      Italy (Rome, Milan, Florence) — 4 quarterly snapshots 2024
     new_york_2023_2024/
-      NYairbnb2023.zip                New York — single snapshot ~March 2023
-      NYairbnb2024.zip                New York — single snapshot ~January 2024
-      new_york_data.csv               Zillow ZORI rental index for New York
+      NYairbnb2023.zip                New York — single snapshot ~March 2023 (Kaggle)
+      NYairbnb2024.zip                New York — single snapshot ~January 2024 (Kaggle)
+      new_york_data.csv               Zillow ZORI — wide-format monthly time series by ZIP code
     insideairbnb_2025/
-      Roma/                           Inside Airbnb snapshots (2025)
-      Milano/                         Inside Airbnb snapshots (2025)
-      Firenze/                        Inside Airbnb snapshots (2025)
-      NewYork/                        Inside Airbnb snapshots (2025)
-      LosAngeles/                     Inside Airbnb snapshots (2025)
-  omi/                                OMI — quotazioni immobiliari (Agenzia delle Entrate)
-    Roma/                             VALORI + ZONE: 2023/1, 2023/2, 2024/1, 2024/2, 2025/1
-    Milano/                           VALORI + ZONE: 2023/1, 2023/2, 2024/1, 2024/2, 2025/1
-    Firenze/                          VALORI + ZONE: 2023/1, 2023/2, 2024/1, 2024/2, 2025/1
+      Roma/                           Inside Airbnb .csv.gz snapshots (2025)
+      Milano/                         Inside Airbnb .csv.gz snapshots (2025)
+      Firenze/                        Inside Airbnb .csv.gz snapshots (2025)
+      NewYork/                        Inside Airbnb .csv.gz snapshots (2025)
+  omi/
+    Roma/                             VALORI + ZONE CSVs: 2023/1, 2023/2, 2024/1, 2024/2, 2025/1
+    Milano/                           VALORI + ZONE CSVs: 2023/1, 2023/2, 2024/1, 2024/2, 2025/1
+    Firenze/                          VALORI + ZONE CSVs: 2023/1, 2023/2, 2024/1, 2024/2, 2025/1
   processed/
-    roma.csv                          All Rome Airbnb snapshots merged (2024–2025)
-    milano.csv                        All Milan Airbnb snapshots merged (2024–2025)
-    firenze.csv                       All Florence Airbnb snapshots merged (2024–2025)
-    new_york.csv                      All New York Airbnb snapshots merged (2023–2025)
-    master_airbnb.csv                 All cities combined — Entire home/apt only
-    omi_roma.csv                      OMI abitazioni civili — Roma (tutti i semestri)
-    omi_milano.csv                    OMI abitazioni civili — Milano (tutti i semestri)
-    omi_firenze.csv                   OMI abitazioni civili — Firenze (tutti i semestri)
-    omi_master.csv                    OMI abitazioni civili — tutte le città
-    panel_italy.csv                   Panel mensile (OMI €/m²/mese + n_listings) — città italiane — input OLS
-    panel_ny.csv                      Panel mensile (ZORI $/mese + n_listings) — New York — input ITS
+    roma.csv                          All Rome Airbnb snapshots merged (2024–2025), all room types
+    milano.csv                        All Milan Airbnb snapshots merged (2024–2025), all room types
+    firenze.csv                       All Florence Airbnb snapshots merged (2024–2025), all room types
+    new_york.csv                      All New York Airbnb snapshots merged (2023–2025), all room types
+    master_airbnb.csv                 All cities combined — Entire home/apt only (573,981 rows)
+    omi_roma.csv                      OMI abitazioni civili (Cod_Tip=20) — Roma, all semesters
+    omi_milano.csv                    OMI abitazioni civili — Milano, all semesters
+    omi_firenze.csv                   OMI abitazioni civili — Firenze, all semesters
+    omi_master.csv                    OMI abitazioni civili — all Italian cities combined
+    panel_italy.csv                   Monthly panel: OMI loc_medio (€/m²/mese) + n_listings — Italian cities — OLS input
+    panel_ny.csv                      Monthly panel: Zillow ZORI ($/mese) + n_listings — New York — ITS input
 geo/
   neighbourhoodsMilano.geojson
   nieghborhoddsRoma.geojson
   neighbourhoodsNY.geojson
-  neighbourhoodsLA.geojson
   airbnb_italy_city_neighbourhoods_geojson.geojson
 plots/
-  01_listing_trends.png               Trend listing mensili per città (2023–2025)
-  02_ny_ll18_zori.png                 NYC — dual axis: listing + ZORI, con annotazione Local Law 18
-  03_omi_trends.png                   Canone locazione OMI per città italiana (semestri reali + interpolato)
-  04_price_distribution.png           Distribuzione prezzi Airbnb per città (boxplot, clip 95°p)
-  05_top_neighbourhoods.png           Top 10 quartieri per n° listing — snapshot più recente
-  06_ny_heatmap.png                   NYC — heatmap listing per anno × mese (stagionalità + LL18)
-01_eda_airbnb.ipynb                   Main EDA notebook (Phase 1–2 preprocessing + Phase 2 EDA)
+  01_listing_trends.png               Monthly Entire home/apt listing trends for all cities (2023–2025)
+  02_ny_ll18_zori.png                 NYC dual-axis: listing volume + Zillow ZORI, with LL18 annotation
+  03_omi_trends.png                   OMI loc_medio (€/m²/mese) for Italian cities — real semester dots
+  04_price_distribution.png           Airbnb nightly price distribution per city (boxplot, clipped at 95th pct)
+  05_top_neighbourhoods.png           Top-10 neighbourhoods by listing count — most recent snapshot per city
+  06_ny_heatmap.png                   NYC listing counts: year × month heatmap (real snapshots only)
+01_eda_airbnb.ipynb                   Main notebook — Phase 1 preprocessing + Phase 2 EDA (Steps 1–3)
 ```
