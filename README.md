@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project investigates the relationship between the growth of Airbnb listings and residential rental prices in four cities — Milan, Rome, Florence, and New York — spanning the period 2023 to 2025. The analysis is conducted as part of the Group Project for the Digital Economy course and addresses a central policy question at the intersection of platform economics, urban housing markets, and digital regulation.
+This project investigates the relationship between the growth of Airbnb listings and residential rental prices in four cities — Milan, Rome, Florence, and New York — spanning the period 2023 to 2025. The analysis is conducted as part of the Group Project for the Internet and Network Economics course and addresses a central policy question at the intersection of platform economics, urban housing markets, and digital regulation.
 
 The core hypothesis is that the expansion of short-term rental platforms generates measurable upward pressure on long-term rental prices by withdrawing residential units from the traditional housing stock. The project combines exploratory data analysis with two complementary quasi-experimental approaches: an Interrupted Time Series (ITS) model for New York — exploiting the sharp listing contraction caused by Local Law 18 (September 2023) — and a cross-sectional OLS model for the Italian cities, operating at the OMI zona level.
 
