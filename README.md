@@ -57,9 +57,17 @@ Before any modelling, a systematic EDA characterises the data along six dimensio
 
 New York provides the cleanest identification opportunity in the dataset. Local Law 18, enforced from September 2023, imposed a host registration requirement that caused active Entire home/apt listings to fall from approximately 24,000 to 11,500 within two months — a ~55% contraction. This constitutes a plausibly exogenous shock to short-term rental supply that is exploited as a natural experiment.
 
-The ITS model estimates the causal effect of this regulatory shock on the Zillow ZORI rent index:
+Two nested model specifications are estimated on **N = 34 monthly observations** (March 2023 – December 2025):
+
+**BASE model:**
 
 $$\text{ZORI}_t = \alpha + \beta_1 \, t + \beta_2 \cdot \mathbf{1}[t > T] + \beta_3 \, (t - T) \cdot \mathbf{1}[t > T] + \varepsilon_t$$
+
+**EXTENDED model** (adds macroeconomic control and seasonal dummies):
+
+$$\text{ZORI}_t = \alpha + \beta_1 \, t + \beta_2 \cdot \mathbf{1}[t > T] + \beta_3 \, (t - T) \cdot \mathbf{1}[t > T] + \beta_4 \cdot \text{FedRate}_t + \sum_{m=2}^{12} \gamma_m D_m + \varepsilon_t$$
+
+The Fed funds rate is included to verify whether the ZORI dynamics are attributable to LL18 or instead to macroeconomic conditions. Monthly dummies absorb systematic seasonal patterns in rents.
 
 **Variable legend:**
 
@@ -72,13 +80,53 @@ $$\text{ZORI}_t = \alpha + \beta_1 \, t + \beta_2 \cdot \mathbf{1}[t > T] + \bet
 | $(t - T) \cdot \mathbf{1}[t > T]$ | Regressor | Interaction term: months elapsed *since* the intervention, equal to 0 before $T$ and counting up from 1 afterward. Captures any **change in the slope** (trend) of rent growth after the intervention. |
 | $\alpha$ | Parameter | Intercept — baseline rent level at $t = 0$ (March 2023). |
 | $\beta_1$ | Parameter | **Pre-intervention trend** — monthly change in ZORI before September 2023, in $/month per month. |
-| $\beta_2$ | Parameter | **Immediate level shift** — the jump (positive) or drop (negative) in ZORI on the month of intervention, in $/month. A positive $\beta_2$ would mean rents jumped up right after LL18. |
-| $\beta_3$ | Parameter | **Post-intervention trend change** — the additional monthly slope after LL18 relative to the pre-intervention trend. A negative $\beta_3$ means rent growth slowed down post-intervention (consistent with restored supply). |
-| $\varepsilon_t$ | Error | OLS residual. |
+| $\beta_2$ | Parameter | **Immediate level shift** — the jump (positive) or drop (negative) in ZORI on the month of intervention, in $/month. |
+| $\beta_3$ | Parameter | **Post-intervention trend change** — the additional monthly slope after LL18 relative to the pre-intervention trend. |
+| $\beta_4$ | Parameter | **Fed funds rate coefficient** (extended model only) — $/month change in ZORI per 1 pp increase in the federal funds rate. |
+| $\gamma_m$ | Parameters | Monthly seasonal dummies (February–December; January = reference month). |
+| $\varepsilon_t$ | Error | OLS residual. All inference uses HAC standard errors (Newey-West, maxlags = 4). |
 
-**Interpretation of hypotheses:** The supply-withdrawal channel predicts that *more* Airbnb listings → *higher* rents. If LL18 removed listings and returned supply to the long-term market, we would expect either $\beta_2 < 0$ (rents drop immediately) or $\beta_3 < 0$ (rent growth decelerates as the housing supply rebuilds). Conversely, if rents were already rising for other reasons, $\beta_2$ might be non-significant.
+**Estimation results (HAC standard errors, Newey-West maxlags = 4):**
 
-The model is estimated on **N = 34 monthly observations** (March 2023 – December 2025) of real Zillow ZORI data for the New York metropolitan area.
+| Parameter | BASE | ESTESO | Interpretation |
+|-----------|:----:|:------:|----------------|
+| β₁ — pre-LL18 trend | +43.21 $/mo *** | −6.44 $/mo ns | Trend absorbed by Fed rate in extended model |
+| β₂ — level shift (Sep 2023) | **−78.88 $** * | **−88.14 $** ns | Immediate drop at LL18 enforcement — stable across specifications |
+| β₃ — slope change | **−18.92 $/mo** *** | **+44.23 $/mo** ** | Sign reversal due to collinearity with Fed rate |
+| β₄ — Fed rate | — | +208.17 $ * | Higher rates → reduced mortgage access → higher rents |
+| R² | 0.829 | **0.930** | |
+| Adjusted R² | 0.812 | **0.871** | |
+| AIC | 421.9 | **415.6** | |
+
+The stability of β₂ ≈ −79/−88 $ across both specifications is the most robust finding: LL18 caused an immediate ~$80/month drop in average NYC rents. The sign reversal in β₃ (from −19 to +44 $/month) reflects multicollinearity between the time trend and the Fed rate cycle; the extended model attributes the pre-LL18 growth mainly to rising rates rather than underlying trend.
+
+**Cumulative effect at key horizons (extended model, delta method):**
+
+| Horizon | Estimated effect | SE | Sig |
+|---------|:---------------:|:--:|:---:|
+| t+1 (1 month) | −44 $ | 84 | ns |
+| t+6 (6 months) | +177 $ | 131 | ns |
+| t+12 (12 months) | +443 $ | 234 | * |
+| t+24 (24 months) | +973 $ | 462 | ** |
+
+---
+
+### Phase 3b — Out-of-Sample Forecast (March 2026 – March 2027)
+
+Both ITS models are projected out-of-sample from the current date (March 2026) through March 2027. The extended model holds the Fed funds rate fixed at the last observed value in the panel; monthly seasonal dummies are constructed for each future month.
+
+**Forecast assumptions:** (i) the post-LL18 trend continues at the estimated slope β₃; (ii) no new regulatory or macroeconomic shocks; (iii) the Fed rate remains at its last observed level (extended model only).
+
+Key forecast horizons (point estimates, 95% CI covers parameter uncertainty only):
+
+| Horizon | Date | BASE ($/mo) | EXTENDED ($/mo) |
+|---------|------|:-----------:|:---------------:|
+| +6 months | Sep 2026 | — | — |
+| +12 months | Mar 2027 | — | — |
+
+*Run `02_its_new_york.ipynb` cell 10 to obtain the numerical forecasts, which depend on the estimated parameters.*
+
+> **Methodological caveat:** linear ITS forecasts become unreliable at long horizons. The 95% CIs widen substantially beyond the estimation sample. Results should be interpreted as scenario projections conditional on model assumptions, not as unconditional point predictions.
 
 ---
 
@@ -194,4 +242,5 @@ plots/
   05_top_neighbourhoods.png           Top-10 neighbourhoods by listing count — most recent snapshot per city
   06_ny_heatmap.png                   NYC listing counts: year × month heatmap (real snapshots only)
 01_eda_airbnb.ipynb                   Main notebook — Phase 1 preprocessing + Phase 2 EDA (Steps 1–3)
+02_its_new_york.ipynb                 ITS analysis — Phase 3: BASE + ESTESO models, diagnostics, cumulative effects, out-of-sample forecast (Mar 2026 – Mar 2027)
 ```
